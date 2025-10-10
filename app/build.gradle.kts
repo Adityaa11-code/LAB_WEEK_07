@@ -1,7 +1,17 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
 }
+
+// --- Load MAPS_API_KEY from local.properties ---
+val localProperties = Properties()
+val localFile = rootProject.file("local.properties")
+if (localFile.exists()) {
+    localFile.inputStream().use { localProperties.load(it) }
+}
+val MAPS_API_KEY: String = localProperties.getProperty("MAPS_API_KEY") ?: ""
 
 android {
     namespace = "com.example.lab_week_07"
@@ -15,6 +25,9 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // Inject Google Maps API key to string resource
+        resValue("string", "google_maps_key", MAPS_API_KEY)
     }
 
     buildTypes {
@@ -27,7 +40,6 @@ android {
         }
     }
 
-    // ✅ Tambahan penting supaya ActivityMapsBinding kebuat
     buildFeatures {
         viewBinding = true
     }
@@ -47,7 +59,7 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("com.google.android.material:material:1.12.0")
 
-    // Penting buat ActivityResultLauncher
+    // Activity Result API & Fragment KTX
     implementation("androidx.activity:activity-ktx:1.9.3")
     implementation("androidx.fragment:fragment-ktx:1.8.3")
 
@@ -55,7 +67,7 @@ dependencies {
     implementation("com.google.android.gms:play-services-maps:18.2.0")
     implementation("com.google.android.gms:play-services-location:21.3.0")
 
-    // Optional tapi direkomendasi buat test
+    // Test (optional)
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
