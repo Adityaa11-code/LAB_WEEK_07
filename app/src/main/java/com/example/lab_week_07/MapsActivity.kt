@@ -2,51 +2,58 @@ package com.example.lab_week_07
 
 import android.Manifest.permission.ACCESS_FINE_LOCATION
 import android.content.pm.PackageManager
+import android.location.Location
 import android.os.Bundle
 import android.util.Log
-import android.app.AlertDialog
-import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.ContextCompat
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
+import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
+import com.example.lab_week_07.databinding.ActivityMapsBinding
+
 
 class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
     private lateinit var mMap: GoogleMap
     private lateinit var requestPermissionLauncher: ActivityResultLauncher<String>
+    private val fusedLocationProviderClient by lazy {
+        LocationServices.getFusedLocationProviderClient(this)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_maps)
 
-        val mapFragment = supportFragmentManager
-            .findFragmentById(R.id.map) as SupportMapFragment
-        mapFragment.getMapAsync(this)
-
+        // Register permission launcher
         requestPermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
             if (isGranted) {
-                Log.d("MapsActivity", "Permission granted. Getting last location...")
                 getLastLocation()
             } else {
-                Log.d("MapsActivity", "Permission denied. Showing rationale...")
                 showPermissionRationale {
                     requestPermissionLauncher.launch(ACCESS_FINE_LOCATION)
                 }
             }
         }
+
+        // Get map fragment and set callback
+        val mapFragment = supportFragmentManager
+            .findFragmentById(R.id.map) as SupportMapFragment
+        mapFragment.getMapAsync(this)
     }
 
-    private fun hasLocationPermission() = ContextCompat.checkSelfPermission(
-        this,
-        ACCESS_FINE_LOCATION
-    ) == PackageManager.PERMISSION_GRANTED
+    // Check if location permission is granted
+    private fun hasLocationPermission() =
+        ContextCompat.checkSelfPermission(this, ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
 
+    // Show rationale dialog if user denied permission before
     private fun showPermissionRationale(positiveAction: () -> Unit) {
         AlertDialog.Builder(this)
             .setTitle("Location permission")
@@ -57,54 +64,53 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             .show()
     }
 
+    // Get last known location and update map
     private fun getLastLocation() {
-        Log.d("MapsActivity", "getLastLocation() called.")
-
         if (hasLocationPermission()) {
             try {
-                // Karena kita belum punya fusedLocationProviderClient, kita ganti dengan default location
-                val defaultLocation = LatLng(-6.2088, 106.8456) // Jakarta
-                updateMapLocation(defaultLocation)
-                addMarkerAtLocation(defaultLocation, "Default Location")
-
-                Log.d("MapsActivity", "Using default location because FusedLocationProviderClient is not implemented yet.")
+                fusedLocationProviderClient.lastLocation
+                    .addOnSuccessListener { location: Location? ->
+                        location?.let {
+                            val userLocation = LatLng(location.latitude, location.longitude)
+                            updateMapLocation(userLocation)
+                            addMarkerAtLocation(userLocation, "You")
+                        }
+                    }
+                    .addOnFailureListener { e ->
+                        Log.e("MapsActivity", "Failed to get location", e)
+                    }
             } catch (e: SecurityException) {
-                Log.e("MapsActivity", "SecurityException: ${e.message}")
+                Log.e("MapsActivity", "SecurityException: ${e.message}", e)
             }
         } else {
-            Log.d("MapsActivity", "Permission not granted. Skipping location fetch.")
-            // Tetap tampilkan peta, tapi tanpa marker
-            val defaultLocation = LatLng(-6.2088, 106.8456)
-            updateMapLocation(defaultLocation)
+            requestPermissionLauncher.launch(ACCESS_FINE_LOCATION)
         }
     }
 
+    // Move camera to location
     private fun updateMapLocation(location: LatLng) {
-        mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(location, 7f))
+        mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(location, 15f))
     }
 
+    // Add marker at location
     private fun addMarkerAtLocation(location: LatLng, title: String) {
-        mMap.addMarker(MarkerOptions().title(title).position(location))
+        mMap.addMarker(MarkerOptions().position(location).title(title))
     }
 
+    // Called when map is ready
     override fun onMapReady(googleMap: GoogleMap) {
         mMap = googleMap
 
-        Log.d("MapsActivity", "onMapReady called.")
-
         when {
             hasLocationPermission() -> {
-                Log.d("MapsActivity", "Has permission. Calling getLastLocation()")
                 getLastLocation()
             }
             shouldShowRequestPermissionRationale(ACCESS_FINE_LOCATION) -> {
-                Log.d("MapsActivity", "Showing rationale dialog.")
                 showPermissionRationale {
                     requestPermissionLauncher.launch(ACCESS_FINE_LOCATION)
                 }
             }
             else -> {
-                Log.d("MapsActivity", "Requesting permission for the first time.")
                 requestPermissionLauncher.launch(ACCESS_FINE_LOCATION)
             }
         }
